@@ -26,12 +26,20 @@ endif()
 set(MPI_CXX_SKIP_MPICXX
     true
     CACHE BOOL "The MPI-2 C++ bindings are disabled.")
+
 # required compiler features
 find_package(MPI REQUIRED)
-find_package(OpenMP REQUIRED)
 # library
 find_package(pvfmm REQUIRED)
 find_package(Eigen3 REQUIRED)
+
+find_package(MKL CONFIG)
+if(MKL_FOUND)
+  set(DEP_LIB MKL::MKL)
+else()
+  find_package(OpenMP REQUIRED)
+  set(DEP_LIB OpenMP::OpenMP_CXX)
+endif()
 
 enable_testing()
 
