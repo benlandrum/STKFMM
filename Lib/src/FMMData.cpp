@@ -100,7 +100,8 @@ void FMMData::clear() {
 }
 
 void FMMData::setupTree(const std::vector<double> &srcSLCoord, const std::vector<double> &srcDLCoord,
-                        const std::vector<double> &trgCoord, const int ntreePts, const double *treePtsPtr) {
+                        const std::vector<double> &trgCoord, const int ntreePts, const double *treePtsPtr,
+			std::optional<int> maxDepth) {
     // trgCoord and srcCoord have been scaled to [0,1)^3
     // setup treeData
     treeDataPtr->dim = 3;
@@ -290,7 +291,7 @@ void FMMData::scaleSrc(std::vector<double> &srcSLValue, std::vector<double> &src
 
     const int nSL = srcSLValue.size() / kdimSL;
     if (kernelChoice == KERNEL::PVel || kernelChoice == KERNEL::PVelGrad || kernelChoice == KERNEL::PVelLaplacian ||
-        kernelChoice == KERNEL::Traction || kernelChoice == KERNEL::RPY || kernelChoice == KERNEL::StokesRegVel) {
+        kernelChoice == KERNEL::Traction || kernelChoice == KERNEL::RPY || kernelChoice == KERNEL::RPYReg || kernelChoice == KERNEL::StokesRegVel) {
         // Stokes, RPY, StokesRegVel
 #pragma omp parallel for
         for (int i = 0; i < nSL; i++) {
@@ -450,6 +451,18 @@ void FMMData::scaleTrg(std::vector<double> &trgValue, const double scaleFactor) 
         }
     } break;
     case KERNEL::RPY: {
+        // 3 + 3
+#pragma omp parallel for
+        for (int i = 0; i < nTrg; i++) {
+            // vel 1/r
+            for (int j = 0; j < 3; ++j)
+                trgValue[i * 6 + j] *= scaleFactor;
+            // laplacian vel
+            for (int j = 3; j < 6; ++j)
+                trgValue[i * 6 + j] *= scaleFactor * scaleFactor * scaleFactor;
+        }
+    } break;
+    case KERNEL::RPYReg: {
         // 3 + 3
 #pragma omp parallel for
         for (int i = 0; i < nTrg; i++) {

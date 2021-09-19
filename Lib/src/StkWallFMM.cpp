@@ -26,6 +26,16 @@ StkWallFMM::StkWallFMM(int multOrder_, int maxPts_, PAXIS pbc_, unsigned int ker
         std::cout << "enable RPY image kernel " << std::endl;
     }
 
+    if (kernelComb & asInteger(KERNEL::RPYReg)) {
+        // RPYReg image, activate RPY, Laplace, & LapQuad kernels
+        poolFMM[KERNEL::RPYReg] = new FMMData(KERNEL::RPYReg, pbc, multOrder, maxPts, enableFF_);           // uS
+        poolFMM[KERNEL::LapPGrad] = new FMMData(KERNEL::LapPGrad, pbc, multOrder, maxPts, enableFF_); // phiSZ+phiDZ
+        poolFMM[KERNEL::LapPGradGrad] =
+            new FMMData(KERNEL::LapPGradGrad, pbc, multOrder, maxPts, enableFF_); // phiS+phiD
+        poolFMM[KERNEL::LapQPGradGrad] = new FMMData(KERNEL::LapQPGradGrad, pbc, multOrder, maxPts, enableFF_); // phibQ
+        std::cout << "enable RPYReg image kernel " << std::endl;
+    }
+
     if (poolFMM.empty()) {
         std::cout << "Error: no kernel activated\n";
     }
