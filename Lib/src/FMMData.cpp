@@ -51,8 +51,8 @@ void FMMData::setupPeriodicData() {
 }
 
 // constructor
-FMMData::FMMData(KERNEL kernelChoice_, PAXIS periodicity_, int multOrder_, int maxPts_, bool enableFF_)
-    : kernelChoice(kernelChoice_), periodicity(periodicity_), multOrder(multOrder_), maxPts(maxPts_), treePtr(nullptr),
+FMMData::FMMData(KERNEL kernelChoice_, PAXIS periodicity_, int multOrder_, int maxPts_, bool enableFF_, int maxDepth_)
+    : kernelChoice(kernelChoice_), periodicity(periodicity_), multOrder(multOrder_), maxPts(maxPts_), maxDepth(maxDepth_), treePtr(nullptr),
       matrixPtr(nullptr), treeDataPtr(nullptr), enableFF(enableFF_) {
 
     comm = MPI_COMM_WORLD;
@@ -100,12 +100,11 @@ void FMMData::clear() {
 }
 
 void FMMData::setupTree(const std::vector<double> &srcSLCoord, const std::vector<double> &srcDLCoord,
-                        const std::vector<double> &trgCoord, const int ntreePts, const double *treePtsPtr,
-			std::optional<int> maxDepth) {
+                        const std::vector<double> &trgCoord, const int ntreePts, const double *treePtsPtr) {
     // trgCoord and srcCoord have been scaled to [0,1)^3
     // setup treeData
     treeDataPtr->dim = 3;
-    treeDataPtr->max_depth = PVFMM_MAX_DEPTH;
+    treeDataPtr->max_depth = maxDepth > 0 ? maxDepth : PVFMM_MAX_DEPTH;
     treeDataPtr->max_pts = maxPts;
 
     treeDataPtr->src_coord = srcSLCoord;

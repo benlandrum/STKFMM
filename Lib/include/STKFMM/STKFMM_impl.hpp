@@ -28,6 +28,7 @@ class FMMData {
 
     int multOrder; ///< multipole order
     int maxPts;    ///< max number of points per octant
+    int maxDepth; ///< max depth of the tree (really the number of levels)
 
     const pvfmm::Kernel<double> *kernelFunctionPtr; ///< pointer to kernel function
 
@@ -50,8 +51,9 @@ class FMMData {
      * @param periodicity_
      * @param multOrder_
      * @param maxPts_
+     * @param maxDepth_ maximum depth (<=0 means use pvfmm default)
      */
-    FMMData(KERNEL kernelChoice_, PAXIS periodicity_, int multOrder_, int maxPts_, bool enableFF_ = true);
+    FMMData(KERNEL kernelChoice_, PAXIS periodicity_, int multOrder_, int maxPts_, bool enableFF_ = true, int maxDepth_ = 0);
 
     /**
      * @brief Destroy the FMMData object
