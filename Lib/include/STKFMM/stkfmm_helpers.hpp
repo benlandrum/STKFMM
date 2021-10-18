@@ -20,24 +20,24 @@
 #define Vec_td Real_t
 #endif
 
-#define GEN_KERNEL_HELPER(MICROKERNEL, SRCDIM, TARDIM, VEC_T, REAL_T)                                                  \
-    generic_kernel<REAL_T, SRCDIM, TARDIM, MICROKERNEL<REAL_T, VEC_T, newton_iter>>(                                   \
+#define GEN_KERNEL_HELPER(MICROKERNEL, SRCDIM, TARDIM, TARAUXDIM, VEC_T, REAL_T)	                               \
+    generic_kernel<REAL_T, SRCDIM, TARDIM, TARAUXDIM, MICROKERNEL<REAL_T, VEC_T, newton_iter>>(                        \
         (REAL_T *)r_src, src_cnt, (REAL_T *)v_src, dof, (REAL_T *)r_trg, trg_cnt, (REAL_T *)v_trg, mem_mgr)
 
-#define GEN_KERNEL(KERNEL, MICROKERNEL, SRCDIM, TARDIM)                                                                \
+#define GEN_KERNEL(KERNEL, MICROKERNEL, SRCDIM, TARDIM, TARAUXDIM)		                                       \
     template <class T, int newton_iter = 0>                                                                            \
     void KERNEL(T *r_src, int src_cnt, T *v_src, int dof, T *r_trg, int trg_cnt, T *v_trg,                             \
                 mem::MemoryManager *mem_mgr) {                                                                         \
                                                                                                                        \
         if (mem::TypeTraits<T>::ID() == mem::TypeTraits<float>::ID()) {                                                \
             typedef float Real_t;                                                                                      \
-            GEN_KERNEL_HELPER(MICROKERNEL, SRCDIM, TARDIM, Vec_ts, Real_t);                                            \
+            GEN_KERNEL_HELPER(MICROKERNEL, SRCDIM, TARDIM, TARAUXDIM, Vec_ts, Real_t);                                 \
         } else if (mem::TypeTraits<T>::ID() == mem::TypeTraits<double>::ID()) {                                        \
             typedef double Real_t;                                                                                     \
-            GEN_KERNEL_HELPER(MICROKERNEL, SRCDIM, TARDIM, Vec_td, Real_t);                                            \
+            GEN_KERNEL_HELPER(MICROKERNEL, SRCDIM, TARDIM, TARAUXDIM, Vec_td, Real_t);                                 \
         } else {                                                                                                       \
             typedef T Real_t;                                                                                          \
-            GEN_KERNEL_HELPER(MICROKERNEL, SRCDIM, TARDIM, Real_t, Real_t);                                            \
+            GEN_KERNEL_HELPER(MICROKERNEL, SRCDIM, TARDIM, TARAUXDIM, Real_t, Real_t);                                 \
         }                                                                                                              \
     }
 // clang-format on

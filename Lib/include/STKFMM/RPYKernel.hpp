@@ -216,7 +216,7 @@ void rpy_reg_sphere_to_sphere_uKernel(Matrix<Real_t> &src_coord,
             const Vec_t tx = load_intrin<Vec_t>(&trg_coord[0][t]);
             const Vec_t ty = load_intrin<Vec_t>(&trg_coord[1][t]);
             const Vec_t tz = load_intrin<Vec_t>(&trg_coord[2][t]);
-	    const Vec_t b  = load_intrin<Vec_t>(&trg_coord[3][t]);
+	    const Vec_t b  = load_intrin<Vec_t>(&trg_value[3][t]);
 	    const Vec_t b2 = mul_intrin(b, b);
 
             Vec_t vx = zero_intrin<Vec_t>();
@@ -239,24 +239,29 @@ void rpy_reg_sphere_to_sphere_uKernel(Matrix<Real_t> &src_coord,
 		const Vec_t fdotr_rinv3 = mul_intrin(fdotr, rinv3);
 		const Vec_t fdotr_rinv5 = mul_intrin(fdotr, rinv5);
 
-                const Vec_t a           = bcast_intrin<Vec_t>(&src_value[3][s]); ////
-		const Vec_t a2          = mul_intrin(a, a); ////
+                const Vec_t a           = bcast_intrin<Vec_t>(&src_value[3][s]);
+		const Vec_t a2          = mul_intrin(a, a);
 		const Vec_t a_add_b     = add_intrin(a, b);
 		const Vec_t a_add_b_2   = mul_intrin(a_add_b, a_add_b);
 		const Vec_t a_sub_b     = sub_intrin(a, b);
 		const Vec_t a_sub_b_2   = mul_intrin(a_sub_b, a_sub_b);
+
+		// TODO: Optimize this with the unconditional section below.
+		Vec_t vx_add = zero_intrin<Vec_t>();
+		Vec_t vy_add = zero_intrin<Vec_t>();
+		Vec_t vz_add = zero_intrin<Vec_t>();
 
 		// Scenario: r <= |a - b|
 		// Set unconditionally; override later.
 		{
 		  const Vec_t max_a2_b2 = max_intrin(a2, b2);
 		  const Vec_t radinv = mul_intrin(rsqrt_wrapper<Vec_t, Real_t, NWTN_ITER>(max_a2_b2), nwtn_factor);
-		  vx = mul_intrin(four_over_three,
-				  mul_intrin(radinv, fx));
-		  vy = mul_intrin(four_over_three,
-				  mul_intrin(radinv, fy));
-		  vz = mul_intrin(four_over_three,
-				  mul_intrin(radinv, fz));
+		  vx_add = mul_intrin(four_over_three,
+				      mul_intrin(radinv, fx));
+		  vy_add = mul_intrin(four_over_three,
+				      mul_intrin(radinv, fy));
+		  vz_add = mul_intrin(four_over_three,
+				      mul_intrin(radinv, fz));
 		}
 
 		// Scenario: |a - b| < r <= a + b
@@ -266,13 +271,11 @@ void rpy_reg_sphere_to_sphere_uKernel(Matrix<Real_t> &src_coord,
 		  // TODO: Revisit these operations for extra multiplications (ifactor).
 		  const Vec_t a2b2       = mul_intrin(a2, b2);
 		  const Vec_t abinv      = mul_intrin(rsqrt_wrapper<Vec_t, Real_t, NWTN_ITER>(a2b2), nwtn_factor);
-		  const Vec_t front      = mul_intrin(four_over_three, abinv);
 		  const Vec_t isub_sqrt  = add_intrin(a_sub_b_2,
 						      mul_intrin(three, r2));
 		  Vec_t ifactor          = sub_intrin(mul_intrin(one_over_two, a_add_b),
 						      mul_intrin(mul_intrin(one_over_thirtytwo, rinv3),
-							 mul_intrin(isub_sqrt, isub_sqrt)));
-		  ifactor                = mul_intrin(ifactor, front);
+								 mul_intrin(isub_sqrt, isub_sqrt)));
 
 		  Vec_t vx_trial = mul_intrin(ifactor, fx);
 		  Vec_t vy_trial = mul_intrin(ifactor, fy);
@@ -286,10 +289,15 @@ void rpy_reg_sphere_to_sphere_uKernel(Matrix<Real_t> &src_coord,
 		  vy_trial = add_intrin(vy_trial, mul_intrin(dy, xxfactor));
 		  vz_trial = add_intrin(vz_trial, mul_intrin(dz, xxfactor));
 
+		  const Vec_t front = mul_intrin(four_over_three, abinv);
+		  vx_trial = mul_intrin(vx_trial, front);
+		  vy_trial = mul_intrin(vy_trial, front);
+		  vz_trial = mul_intrin(vz_trial, front);
+
 		  const Vec_t sub_lt_r = cmplt_intrin(a_sub_b_2, r2);
-		  vx = blendv_intrin(vx, vx_trial, sub_lt_r);
-		  vy = blendv_intrin(vy, vy_trial, sub_lt_r);
-		  vz = blendv_intrin(vz, vz_trial, sub_lt_r);
+		  vx_add = blendv_intrin(vx_add, vx_trial, sub_lt_r);
+		  vy_add = blendv_intrin(vy_add, vy_trial, sub_lt_r);
+		  vz_add = blendv_intrin(vz_add, vz_trial, sub_lt_r);
 		}
 
 		// Scenario: a + b < r
@@ -315,10 +323,14 @@ void rpy_reg_sphere_to_sphere_uKernel(Matrix<Real_t> &src_coord,
 							     mul_intrin(a2_add_b2,
 									mul_intrin(dz, fdotr_rinv5))));
 		  const Vec_t add_lt_r = cmplt_intrin(a_add_b_2, r2);
-		  vx = blendv_intrin(vx, vx_trial, add_lt_r);
-		  vy = blendv_intrin(vy, vy_trial, add_lt_r);
-		  vz = blendv_intrin(vz, vz_trial, add_lt_r);
+		  vx_add = blendv_intrin(vx_add, vx_trial, add_lt_r);
+		  vy_add = blendv_intrin(vy_add, vy_trial, add_lt_r);
+		  vz_add = blendv_intrin(vz_add, vz_trial, add_lt_r);
 		}
+
+		vx = add_intrin(vx, vx_add);
+		vy = add_intrin(vy, vy_add);
+		vz = add_intrin(vz, vz_add);
             }
 
             vx = add_intrin(mul_intrin(vx, FACV), load_intrin<Vec_t>(&trg_value[0][t]));
@@ -622,11 +634,11 @@ void laplace_phigradphi_uKernel(Matrix<Real_t> &src_coord, Matrix<Real_t> &src_v
     }
 }
 
-GEN_KERNEL(rpy_u, rpy_u_uKernel, 4, 3)
-GEN_KERNEL(rpy_ulapu, rpy_ulapu_uKernel, 4, 6)
-GEN_KERNEL(rpy_reg_sphere_to_sphere, rpy_reg_sphere_to_sphere_uKernel, 4, 4)
-GEN_KERNEL(stk_ulapu, stk_ulapu_uKernel, 3, 6)
-GEN_KERNEL(rpy_reg_surface_to_sphere, rpy_reg_surface_to_sphere_uKernel, 3, 4)
+GEN_KERNEL(rpy_u, rpy_u_uKernel, 4, 3, 0)
+GEN_KERNEL(rpy_ulapu, rpy_ulapu_uKernel, 4, 6, 0)
+GEN_KERNEL(rpy_reg_sphere_to_sphere, rpy_reg_sphere_to_sphere_uKernel, 4, 3, 1)
+GEN_KERNEL(stk_ulapu, stk_ulapu_uKernel, 3, 6, 0)
+GEN_KERNEL(rpy_reg_surface_to_sphere, rpy_reg_surface_to_sphere_uKernel, 3, 3, 1)
 // GEN_KERNEL(laplace_phigradphi, laplace_phigradphi_uKernel, 4, 4)
 
 template <class T>

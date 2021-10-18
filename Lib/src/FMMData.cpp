@@ -189,8 +189,8 @@ void FMMData::evaluateFMM(std::vector<double> &srcSLValue, std::vector<double> &
         exit(1);
     }
     scaleSrc(srcSLValue, srcDLValue, scale);
-    std::fill(trgValue.begin(), trgValue.end(), 0.0);
-    PtFMM_Evaluate(treePtr, trgValue, nTrg, &srcSLValue, &srcDLValue);
+    scaleTrg(trgValue, 1.0 / scale);
+    PtFMM_Evaluate(treePtr, trgValue, &srcSLValue, &srcDLValue);
     periodizeFMM(trgValue);
     scaleTrg(trgValue, scale);
 }
@@ -462,15 +462,15 @@ void FMMData::scaleTrg(std::vector<double> &trgValue, const double scaleFactor) 
         }
     } break;
     case KERNEL::RPYReg: {
-        // 3 + 3
+        // 3 + 1
 #pragma omp parallel for
         for (int i = 0; i < nTrg; i++) {
-            // vel 1/r
-            for (int j = 0; j < 3; ++j)
-                trgValue[i * 6 + j] *= scaleFactor;
-            // laplacian vel
-            for (int j = 3; j < 6; ++j)
-                trgValue[i * 6 + j] *= scaleFactor * scaleFactor * scaleFactor;
+	    // vel
+	    for (int j = 0; j < 3; ++j) {
+	        trgValue[i * 4 + j] *= scaleFactor;
+	    }
+	    // radius
+	    trgValue[i * 4 + 3] /= scaleFactor;
         }
     } break;
     }

@@ -24,6 +24,8 @@ class PointDistribution {
     void randomPoints(int dim, int nPts, double box, double shift, DistType type, std::vector<double> &ptsCoord,
                       double m = 1.0, double s = 1.0);
 
+    double randomUniform(double low, double high);
+
     void randomUniformFill(std::vector<double> &vec, double low, double high);
 
     void randomLogNormalFill(std::vector<double> &vec, double a, double b);

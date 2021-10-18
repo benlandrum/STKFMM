@@ -2,6 +2,7 @@
 #include "Util/CLI11.hpp"
 #include "Util/json.hpp"
 
+#include <exception>
 #include <iostream>
 #include <memory>
 
@@ -15,6 +16,7 @@ std::unordered_map<KERNEL, std::pair<kernel_func, kernel_func>>
                 {KERNEL::LapQPGradGrad, std::make_pair(LaplaceQPGradGrad, nullptr)},
                 {KERNEL::Stokes, std::make_pair(StokesSL, nullptr)},
                 {KERNEL::RPY, std::make_pair(StokesSLRPY, nullptr)},
+		//{KERNEL::RPYReg, std::make_pair(RPYRegSL, nullptr)},
                 {KERNEL::StokesRegVel, std::make_pair(StokesRegSLVel, nullptr)},
                 {KERNEL::StokesRegVelOmega, std::make_pair(StokesRegSLVelOmega, nullptr)},
                 {KERNEL::PVel, std::make_pair(StokesSLPVel, StokesDLPVel)},
@@ -318,7 +320,7 @@ void genSrcValue(const Config &config, const Point &point, Input &input) {
         pd.randomUniformFill(value.srcLocalSL, -1, 1);
         pd.randomUniformFill(value.srcLocalDL, -1, 1);
 
-        if (kernel == KERNEL::StokesRegVel || kernel == KERNEL::StokesRegVelOmega || kernel == KERNEL::RPY) {
+        if (kernel == KERNEL::StokesRegVel || kernel == KERNEL::StokesRegVelOmega || kernel == KERNEL::RPY || kernel == KERNEL::RPYReg) {
             // sphere radius/regularization must be small
             const double reg = config.epsilon;
             auto setreg = [&](double &v) { v = std::abs(v) * reg; };
@@ -451,6 +453,8 @@ void runSimpleKernel(const Config &config, const Point &point, Input &input, Res
         PointDistribution::collectPtsAll(srcDLCoordGlobal);
 
         KERNEL kernel = data.first;
+	if (kernel == KERNEL::RPYReg)
+	  throw std::runtime_error("not yet supported");
         auto &value = data.second;
         int kdimSL, kdimDL, kdimTrg;
         std::tie(kdimSL, kdimDL, kdimTrg) = getKernelDimension(kernel);
@@ -556,6 +560,15 @@ void runFMM(const Config &config, const int p, const Point &point, Input &input,
             trgLocalValue.clear();
             trgLocalValue.resize(kdimTrg * nTrg, 0);
 
+	    // Fill with random radii.
+	    if (kernel == KERNEL::RPYReg) {
+	      PointDistribution pd(config.rngseed);
+	      for (int i = 0; i < nTrg; i++) {
+		trgLocalValue[kdimTrg * i + kdimTrg - 1] =
+		  pd.randomUniform(0, config.epsilon);
+	      }
+            }
+
             timer.tick();
             if (nSL)
                 fmmPtr->evaluateKernel(kernel, 0, PPKERNEL::SLS2T,                //
@@ -578,6 +591,15 @@ void runFMM(const Config &config, const int p, const Point &point, Input &input,
             const int nTrg = point.trgLocal.size() / 3;
             trgLocalValue.clear();
             trgLocalValue.resize(kdimTrg * nTrg, 0.0);
+
+	    // Fill with random radii.
+	    if (kernel == KERNEL::RPYReg) {
+	      PointDistribution pd(config.rngseed);
+	      for (int i = 0; i < nTrg; i++) {
+		trgLocalValue[kdimTrg * i + kdimTrg - 1] =
+		  pd.randomUniform(0, config.epsilon);
+	      }
+            }
 
             fmmPtr->clearFMM(kernel);
             fmmPtr->setBox(origin, box);

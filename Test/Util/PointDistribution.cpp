@@ -163,6 +163,11 @@ void PointDistribution::shiftAndScalePoints(std::vector<double> &ptsCoord, doubl
     }
 }
 
+double PointDistribution::randomUniform(double low, double high) {
+  std::uniform_real_distribution<double> dist(low, high);
+  return dist(gen_);
+}
+
 void PointDistribution::randomUniformFill(std::vector<double> &vec, double low, double high) {
     // random fill every entry between [-1,1)
     std::uniform_real_distribution<double> dist(low, high);
