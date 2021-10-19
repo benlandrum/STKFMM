@@ -468,8 +468,6 @@ void rpy_reg_surface_to_sphere_uKernel(Matrix<Real_t> &src_coord,
             Vec_t vx = zero_intrin<Vec_t>();
             Vec_t vy = zero_intrin<Vec_t>();
             Vec_t vz = zero_intrin<Vec_t>();
-
-	    // These are laplacians scaled with a^2/6.
 	    Vec_t lapvx = zero_intrin<Vec_t>();
             Vec_t lapvy = zero_intrin<Vec_t>();
             Vec_t lapvz = zero_intrin<Vec_t>();
@@ -504,20 +502,20 @@ void rpy_reg_surface_to_sphere_uKernel(Matrix<Real_t> &src_coord,
                 lapvz = add_intrin(lapvz, mul_intrin(two, cz));
             }
 
-            vx = add_intrin(mul_intrin(vx, FACV), load_intrin<Vec_t>(&trg_value[0][t]));
-            vy = add_intrin(mul_intrin(vy, FACV), load_intrin<Vec_t>(&trg_value[1][t]));
-            vz = add_intrin(mul_intrin(vz, FACV), load_intrin<Vec_t>(&trg_value[2][t]));
-
 	    // Add the Laplacian part of the velocity.
 	    // Need to scale by the target's squared radius.
 	    const Vec_t b = bcast_intrin<Vec_t>(&trg_value[3][t]);
 	    const Vec_t b2_over_six = mul_intrin(mul_intrin(b, b), one_over_six);
 
-	    vx = add_intrin(mul_intrin(mul_intrin(lapvx, FACV), b2_over_six), load_intrin<Vec_t>(&trg_value[0][t]));
-            vy = add_intrin(mul_intrin(mul_intrin(lapvy, FACV), b2_over_six), load_intrin<Vec_t>(&trg_value[1][t]));
-	    vz = add_intrin(mul_intrin(mul_intrin(lapvz, FACV), b2_over_six), load_intrin<Vec_t>(&trg_value[2][t]));
+	    vx = add_intrin(vx, mul_intrin(lapvx, b2_over_six));
+            vy = add_intrin(vy, mul_intrin(lapvy, b2_over_six));
+	    vz = add_intrin(vz, mul_intrin(lapvz, b2_over_six));
 
-            store_intrin(&trg_value[0][t], vx);
+            vx = add_intrin(mul_intrin(vx, FACV), load_intrin<Vec_t>(&trg_value[0][t]));
+            vy = add_intrin(mul_intrin(vy, FACV), load_intrin<Vec_t>(&trg_value[1][t]));
+            vz = add_intrin(mul_intrin(vz, FACV), load_intrin<Vec_t>(&trg_value[2][t]));
+
+	    store_intrin(&trg_value[0][t], vx);
             store_intrin(&trg_value[1][t], vy);
             store_intrin(&trg_value[2][t], vz);
         }
