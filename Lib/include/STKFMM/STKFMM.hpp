@@ -263,7 +263,7 @@ class StkWallFMM : public STKFMM {
      * @brief evaluate RPY image system
      *
      */
-    void evalRPY();
+    void evalRPY(bool regularized);
 };
 
 } // namespace stkfmm

@@ -16,24 +16,20 @@ StkWallFMM::StkWallFMM(int multOrder_, int maxPts_, PAXIS pbc_, unsigned int ker
             std::cout << "enable Stokes image kernel " << std::endl;
     }
 
-    if (kernelComb & asInteger(KERNEL::RPY)) {
-        // RPY image, activate RPY, Laplace, & LapQuad kernels
-        poolFMM[KERNEL::RPY] = new FMMData(KERNEL::RPY, pbc, multOrder, maxPts, enableFF_);           // uS
+    if (kernelComb & asInteger(KERNEL::RPY) || kernelComb & asInteger(KERNEL::RPYReg)) {
+        if (kernelComb & asInteger(KERNEL::RPY) && kernelComb & asInteger(KERNEL::RPYReg)) {
+	    std::cerr << "RPY and RPYReg not supported together" << std::endl;
+	    exit(1);
+	}
+	bool isRegularized = kernelComb & asInteger(KERNEL::RPYReg);
+	auto primaryKernel = isRegularized ? KERNEL::RPYReg : KERNEL::RPY;
+	// RPY image, activate RPY, Laplace, & LapQuad kernels
+        poolFMM[primaryKernel] = new FMMData(primaryKernel, pbc, multOrder, maxPts, enableFF_);           // uS
         poolFMM[KERNEL::LapPGrad] = new FMMData(KERNEL::LapPGrad, pbc, multOrder, maxPts, enableFF_); // phiSZ+phiDZ
         poolFMM[KERNEL::LapPGradGrad] =
             new FMMData(KERNEL::LapPGradGrad, pbc, multOrder, maxPts, enableFF_); // phiS+phiD
         poolFMM[KERNEL::LapQPGradGrad] = new FMMData(KERNEL::LapQPGradGrad, pbc, multOrder, maxPts, enableFF_); // phibQ
-        std::cout << "enable RPY image kernel " << std::endl;
-    }
-
-    if (kernelComb & asInteger(KERNEL::RPYReg)) {
-        // RPYReg image, activate RPY, Laplace, & LapQuad kernels
-        poolFMM[KERNEL::RPYReg] = new FMMData(KERNEL::RPYReg, pbc, multOrder, maxPts, enableFF_);           // uS
-        poolFMM[KERNEL::LapPGrad] = new FMMData(KERNEL::LapPGrad, pbc, multOrder, maxPts, enableFF_); // phiSZ+phiDZ
-        poolFMM[KERNEL::LapPGradGrad] =
-            new FMMData(KERNEL::LapPGradGrad, pbc, multOrder, maxPts, enableFF_); // phiS+phiD
-        poolFMM[KERNEL::LapQPGradGrad] = new FMMData(KERNEL::LapQPGradGrad, pbc, multOrder, maxPts, enableFF_); // phibQ
-        std::cout << "enable RPYReg image kernel " << std::endl;
+        std::cout << "enable " << (isRegularized ? "RPYReg" : "RPY") << " image kernel " << std::endl;
     }
 
     if (poolFMM.empty()) {
@@ -105,8 +101,8 @@ void StkWallFMM::setupTree(KERNEL kernel) {
         poolFMM[KERNEL::Stokes]->setupTree(srcSLCoordInternal, std::vector<double>(), trgCoordInternal);
         poolFMM[KERNEL::LapPGrad]->setupTree(srcSLCoordInternal, srcSLImageCoordInternal, trgCoordInternal);
         poolFMM[KERNEL::LapPGradGrad]->setupTree(srcSLCoordInternal, std::vector<double>(), trgCoordInternal);
-    } else if (kernel == KERNEL::RPY) {
-        poolFMM[KERNEL::RPY]->setupTree(srcSLCoordInternal, std::vector<double>(), trgCoordInternal);
+    } else if (kernel == KERNEL::RPY || kernel == KERNEL::RPYReg) {
+        poolFMM[kernel]->setupTree(srcSLCoordInternal, std::vector<double>(), trgCoordInternal);
         poolFMM[KERNEL::LapPGrad]->setupTree(srcSLCoordInternal, srcSLCoordInternal, trgCoordInternal);
         poolFMM[KERNEL::LapPGradGrad]->setupTree(srcSLCoordInternal, srcSLImageCoordInternal, trgCoordInternal);
         poolFMM[KERNEL::LapQPGradGrad]->setupTree(srcSLImageCoordInternal, std::vector<double>(), trgCoordInternal,
@@ -131,12 +127,13 @@ void StkWallFMM::evaluateFMM(const KERNEL kernel, const int nSL, const double *s
         for (int i = 0; i < nloop; i++) {
             trgValuePtr[i] += trgValueInternal[i];
         }
-    } else if (kernel == KERNEL::RPY) {
-        // 4->6
+    } else if (kernel == KERNEL::RPY || kernel == KERNEL::RPYReg) {
+        // 4->(4/6)
         srcSLValueInternal.resize(nSL * 4);
-        trgValueInternal.resize(nTrg * 6);
+	bool regularized = kernel == KERNEL::RPYReg;
+        trgValueInternal.resize(nTrg * (regularized ? 4 : 6));
         std::copy(srcSLValuePtr, srcSLValuePtr + 4 * nSL, srcSLValueInternal.begin());
-        evalRPY();
+        evalRPY(kernel == KERNEL::RPYReg);
         const int nloop = 6 * nTrg;
 #pragma omp parallel for
         for (int i = 0; i < nloop; i++) {
@@ -153,8 +150,8 @@ void StkWallFMM::clearFMM(KERNEL kernel) {
         poolFMM[KERNEL::Stokes]->clear();
         poolFMM[KERNEL::LapPGrad]->clear();
         poolFMM[KERNEL::LapPGradGrad]->clear();
-    } else if (kernel == KERNEL::RPY) {
-        poolFMM[KERNEL::RPY]->clear();
+    } else if (kernel == KERNEL::RPY || kernel == KERNEL::RPYReg) {
+        poolFMM[kernel]->clear();
         poolFMM[KERNEL::LapPGrad]->clear();
         poolFMM[KERNEL::LapPGradGrad]->clear();
         poolFMM[KERNEL::LapQPGradGrad]->clear();
@@ -220,15 +217,17 @@ void StkWallFMM::evalStokes() {
     }
 }
 
-void StkWallFMM::evalRPY() {
+void StkWallFMM::evalRPY(bool regularized) {
     const int nSL = srcSLOriginCoordInternal.size() / 3;
     const int nTrg = trgCoordInternal.size() / 3;
-    std::vector<double> srcValRPY(nSL * 4 * 2, 0), trgValRPY(nTrg * 6, 0);                    // RPYFMM, 4->6
-    std::vector<double> srcValLS(nSL * 2, 0), srcValLD(nSL * 3, 0), trgValSD(nTrg * 10, 0);   // LapPGradGrad S, 1/3->10
-    std::vector<double> srcValLSZ(nSL * 2, 0), srcValLDZ(nSL * 6, 0), trgValSDZ(nTrg * 4, 0); // LapPGrad, 1/3->4
-    std::vector<double> srcValQ(nSL * 9, 0), trgValQ(nTrg * 10, 0);                           // LapQPGradGrad, 9->10
+    std::vector<double> srcValRPY(nSL * 4 * 2, 0), trgValRPY(nTrg * (regularized ? 4 : 6), 0); // RPYFMM, 4->(4/6)
+    std::vector<double> srcValLS(nSL * 2, 0), srcValLD(nSL * 3, 0), trgValSD(nTrg * 10, 0);    // LapPGradGrad S, 1/3->10
+    std::vector<double> srcValLSZ(nSL * 2, 0), srcValLDZ(nSL * 6, 0), trgValSDZ(nTrg * 4, 0);  // LapPGrad, 1/3->4
+    std::vector<double> srcValQ(nSL * 9, 0), trgValQ(nTrg * 10, 0);                            // LapQPGradGrad, 9->10
     std::vector<double> empty;
     const double sF = scaleFactor;
+
+    auto primaryKernel = regularized ? KERNEL::RPYReg : KERNEL::RPY;
 
 // step1 RPYFMM
 #pragma omp parallel for
@@ -239,9 +238,12 @@ void StkWallFMM::evalRPY() {
         srcValRPY[4 * (i + nSL)] = -srcSLValueInternal[4 * i];
         srcValRPY[4 * (i + nSL) + 1] = -srcSLValueInternal[4 * i + 1];
         srcValRPY[4 * (i + nSL) + 3] = srcSLValueInternal[4 * i + 3]; // b
+	if (regularized) {
+            trgValRPY[4 * i + 3] = srcSLValueInternal[4 * i + 3]; // b
+	}
     }
     empty.clear();
-    poolFMM[KERNEL::RPY]->evaluateFMM(srcValRPY, empty, trgValRPY, sF);
+    poolFMM[primaryKernel]->evaluateFMM(srcValRPY, empty, trgValRPY, sF);
 
 // step2 Laplace SD
 #pragma omp parallel for
@@ -290,17 +292,30 @@ void StkWallFMM::evalRPY() {
     for (int i = 0; i < nTrg; i++) {
         // 6 dimensional array per target [vx,vy,vz,gx,gy,gz]
         // u = [vx,vy,vz]+a^2/6*[gx,gy,gz]
+        // or 4 dimensional for regularized (ignoring index-3).
         const double x3 = (trgCoordInternal[3 * i + 2] - 0.5) / sF;
-        trgValueInternal[6 * i + 0] = //
-            trgValRPY[6 * i + 0] + trgValSDZ[4 * i + 1] + x3 * trgValSD[10 * i + 1] + x3 * trgValQ[10 * i + 1];
-        trgValueInternal[6 * i + 1] = //
-            trgValRPY[6 * i + 1] + trgValSDZ[4 * i + 2] + x3 * trgValSD[10 * i + 2] + x3 * trgValQ[10 * i + 2];
-        trgValueInternal[6 * i + 2] =                                                                          //
-            trgValRPY[6 * i + 2] + trgValSDZ[4 * i + 3] + x3 * trgValSD[10 * i + 3] + x3 * trgValQ[10 * i + 3] //
+	int dim = regularized ? 4 : 6;
+        trgValueInternal[dim * i + 0] = //
+            trgValRPY[dim * i + 0] + trgValSDZ[4 * i + 1] + x3 * trgValSD[10 * i + 1] + x3 * trgValQ[10 * i + 1];
+        trgValueInternal[dim * i + 1] = //
+            trgValRPY[dim * i + 1] + trgValSDZ[4 * i + 2] + x3 * trgValSD[10 * i + 2] + x3 * trgValQ[10 * i + 2];
+        trgValueInternal[dim * i + 2] =                                                                          //
+            trgValRPY[dim * i + 2] + trgValSDZ[4 * i + 3] + x3 * trgValSD[10 * i + 3] + x3 * trgValQ[10 * i + 3] //
             - trgValSD[10 * i] - trgValQ[10 * i];
-        trgValueInternal[6 * i + 3] = trgValRPY[6 * i + 3] + 2 * trgValSD[10 * i + 6] + 2 * trgValQ[10 * i + 6];
-        trgValueInternal[6 * i + 4] = trgValRPY[6 * i + 4] + 2 * trgValSD[10 * i + 8] + 2 * trgValQ[10 * i + 8];
-        trgValueInternal[6 * i + 5] = trgValRPY[6 * i + 5] + 2 * trgValSD[10 * i + 9] + 2 * trgValQ[10 * i + 9];
+	if (regularized) {
+            auto radialFactor = trgValRPY[4 * i + 3];
+	    radialFactor *= radialFactor;
+	    radialFactor /= 6;
+            // If regularized, we have the Laplacian part already in the velocity.
+            // The radius is also in trgValRPY[6 * i + 3], so we don't want to add it.
+            trgValueInternal[4 * i + 0] += radialFactor * (2 * trgValSD[10 * i + 6] + 2 * trgValQ[10 * i + 6]);
+	    trgValueInternal[4 * i + 1] += radialFactor * (2 * trgValSD[10 * i + 8] + 2 * trgValQ[10 * i + 8]);
+	    trgValueInternal[4 * i + 2] += radialFactor * (2 * trgValSD[10 * i + 9] + 2 * trgValQ[10 * i + 9]);
+	} else {
+            trgValueInternal[6 * i + 3] = trgValRPY[6 * i + 3] + 2 * trgValSD[10 * i + 6] + 2 * trgValQ[10 * i + 6];
+            trgValueInternal[6 * i + 4] = trgValRPY[6 * i + 4] + 2 * trgValSD[10 * i + 8] + 2 * trgValQ[10 * i + 8];
+            trgValueInternal[6 * i + 5] = trgValRPY[6 * i + 5] + 2 * trgValSD[10 * i + 9] + 2 * trgValQ[10 * i + 9];
+	}
     }
 }
 
