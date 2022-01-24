@@ -131,10 +131,11 @@ void StkWallFMM::evaluateFMM(const KERNEL kernel, const int nSL, const double *s
         // 4->(4/6)
         srcSLValueInternal.resize(nSL * 4);
 	bool regularized = kernel == KERNEL::RPYReg;
-        trgValueInternal.resize(nTrg * (regularized ? 4 : 6));
+	auto trgDim = regularized ? 4 : 6;
+	auto nloop = trgDim * nTrg;
+        trgValueInternal.resize(nloop);
         std::copy(srcSLValuePtr, srcSLValuePtr + 4 * nSL, srcSLValueInternal.begin());
         evalRPY(kernel == KERNEL::RPYReg);
-        const int nloop = 6 * nTrg;
 #pragma omp parallel for
         for (int i = 0; i < nloop; i++) {
             trgValuePtr[i] += trgValueInternal[i];
