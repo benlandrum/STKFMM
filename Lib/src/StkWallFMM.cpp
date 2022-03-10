@@ -228,9 +228,9 @@ void StkWallFMM::evalRPY(bool regularized) {
     std::vector<double> empty;
     const double sF = scaleFactor;
 
-    auto primaryKernel = regularized ? KERNEL::RPYReg : KERNEL::RPY;
-
 // step1 RPYFMM
+    // forces in x and y only!!!
+    // source and image coordinates
 #pragma omp parallel for
     for (int i = 0; i < nSL; i++) {
         srcValRPY[4 * i] = srcSLValueInternal[4 * i];         // fx
@@ -244,9 +244,15 @@ void StkWallFMM::evalRPY(bool regularized) {
 	}
     }
     empty.clear();
-    poolFMM[primaryKernel]->evaluateFMM(srcValRPY, empty, trgValRPY, sF);
+    poolFMM[regularized
+	    ? KERNEL::RPYReg
+	    : KERNEL::RPY]->evaluateFMM(srcValRPY, empty, trgValRPY, sF);
 
 // step2 Laplace SD
+    // one possible z-force
+    // the single-layer forces are doubled!!  ben what does this mean again?
+    // the single-layer values are z-only and opposing across the mirror
+    // the double-layer values are only across the mirror, negating x and y
 #pragma omp parallel for
     for (int i = 0; i < nSL; i++) {
         srcValLS[i] = srcSLValueInternal[4 * i + 2] * (-0.5);
@@ -256,9 +262,15 @@ void StkWallFMM::evalRPY(bool regularized) {
         srcValLD[3 * i + 1] = -y3 * srcSLValueInternal[4 * i + 1];
         srcValLD[3 * i + 2] = y3 * srcSLValueInternal[4 * i + 2];
     }
-    poolFMM[KERNEL::LapPGradGrad]->evaluateFMM(srcValLS, srcValLD, trgValSD, sF);
+    poolFMM[regularized
+	    ? KERNEL::LapPGradGradReg
+	    : KERNEL::LapPGradGrad]->evaluateFMM(srcValLS, srcValLD, trgValSD, sF);
 
 // step3 Laplace SDZ
+    // another possible z force
+    // the single-layer forces are doubled!!
+    // the single-layer forces are scaled by distance and involve z-force only across the mirror
+    // the double-layer forces are above and below the mirror
 #pragma omp parallel for
     for (int i = 0; i < nSL; i++) {
         const double y3 = (srcSLOriginCoordInternal[3 * i + 2] - 0.5) / sF;
@@ -270,9 +282,12 @@ void StkWallFMM::evalRPY(bool regularized) {
         srcValLDZ[3 * i + 2] = b2 * f3 * (1. / 6.);
         srcValLDZ[3 * (i + nSL) + 2] = b2 * f3 * (1. / 6.);
     }
-    poolFMM[KERNEL::LapPGrad]->evaluateFMM(srcValLSZ, srcValLDZ, trgValSDZ, sF);
+    poolFMM[regularized
+	    ? KERNEL::LapPGradReg
+	    : KERNEL::LapPGrad]->evaluateFMM(srcValLSZ, srcValLDZ, trgValSDZ, sF);
 
 // step4 Laplace QPGradGrad
+    // above the mirror only!
 #pragma omp parallel for
     for (int i = 0; i < nSL; i++) {
         const double f1 = srcSLValueInternal[4 * i];
@@ -286,7 +301,9 @@ void StkWallFMM::evalRPY(bool regularized) {
         srcValQ[9 * i + 7] = twob2 * f2 * (1. / 6.);
     }
     empty.clear();
-    poolFMM[KERNEL::LapQPGradGrad]->evaluateFMM(srcValQ, empty, trgValQ, sF);
+    poolFMM[regularized
+	    ? KERNEL::LapQPGradGradReg
+	    : KERNEL::LapQPGradGrad]->evaluateFMM(srcValQ, empty, trgValQ, sF);
 
 // assemble
 #pragma omp parallel for
@@ -296,17 +313,28 @@ void StkWallFMM::evalRPY(bool regularized) {
         // or 4 dimensional for regularized (ignoring index-3).
         const double x3 = (trgCoordInternal[3 * i + 2] - 0.5) / sF;
 	int dim = regularized ? 4 : 6;
-        trgValueInternal[dim * i + 0] = //
+	std::cout << "bjlbjl trgValRPY " << trgValRPY[dim * i + 0] << " " << trgValRPY[dim * i + 1] << " " << trgValRPY[dim * i + 2] << " " << trgValRPY[dim * i + 3] << std::endl;
+	std::cout << "bjlbjl trgValInternal " << std::endl;
+	for (int j=0; j<dim; ++j) {
+	  std::cout << j << " " << trgValueInternal[dim * i + j] << std::endl;
+	}
+
+	trgValueInternal[dim * i + 0] = //
             trgValRPY[dim * i + 0] + trgValSDZ[4 * i + 1] + x3 * trgValSD[10 * i + 1] + x3 * trgValQ[10 * i + 1];
         trgValueInternal[dim * i + 1] = //
             trgValRPY[dim * i + 1] + trgValSDZ[4 * i + 2] + x3 * trgValSD[10 * i + 2] + x3 * trgValQ[10 * i + 2];
         trgValueInternal[dim * i + 2] =                                                                          //
             trgValRPY[dim * i + 2] + trgValSDZ[4 * i + 3] + x3 * trgValSD[10 * i + 3] + x3 * trgValQ[10 * i + 3] //
             - trgValSD[10 * i] - trgValQ[10 * i];
+	std::cout << "bjlbjl trgValInternal3 " << std::endl;
+	for (int j=0; j<dim; ++j) {
+	  std::cout << j << " " << trgValueInternal[dim * i + j] << std::endl;
+	}
 	if (regularized) {
             auto radialFactor = trgValRPY[4 * i + 3];
 	    radialFactor *= radialFactor;
 	    radialFactor /= 6;
+	    std::cout << "radialFactor " << radialFactor << std::endl;
             // If regularized, we have the Laplacian part already in the velocity.
             // The radius is also in trgValRPY[6 * i + 3], so we don't want to add it.
             trgValueInternal[4 * i + 0] += radialFactor * (2 * trgValSD[10 * i + 6] + 2 * trgValQ[10 * i + 6]);
@@ -316,6 +344,10 @@ void StkWallFMM::evalRPY(bool regularized) {
             trgValueInternal[6 * i + 3] = trgValRPY[6 * i + 3] + 2 * trgValSD[10 * i + 6] + 2 * trgValQ[10 * i + 6];
             trgValueInternal[6 * i + 4] = trgValRPY[6 * i + 4] + 2 * trgValSD[10 * i + 8] + 2 * trgValQ[10 * i + 8];
             trgValueInternal[6 * i + 5] = trgValRPY[6 * i + 5] + 2 * trgValSD[10 * i + 9] + 2 * trgValQ[10 * i + 9];
+	}
+	std::cout << "bjlbjl trgValInternal3 " << std::endl;
+	for (int j=0; j<dim; ++j) {
+	  std::cout << j << " " << trgValueInternal[dim * i + j] << std::endl;
 	}
     }
 }

@@ -188,11 +188,72 @@ void FMMData::evaluateFMM(std::vector<double> &srcSLValue, std::vector<double> &
         std::cout << "src DL value size error from rank " << rank << std::endl;
         exit(1);
     }
+    std::cout << "bjlbjl before PtFMM_Evaluate scaleSrc: ";
+    for (int i=0; i<srcSLValue.size(); ++i) {
+      std::cout << i << " " << srcSLValue[i] << std::endl;
+    }    
     scaleSrc(srcSLValue, srcDLValue, scale);
     scaleTrg(trgValue, 1.0 / scale);
+    std::cout << "bjlbjl after PtFMM_Evaluate scaleSrc: ";
+    for (int i=0; i<srcSLValue.size(); ++i) {
+      std::cout << i << " " << srcSLValue[i] << std::endl;
+    }    
+
+    /*
+bjlbjl before PtFMM_Evaluate scaleSrc: 0 -18.8496
+1 39.5841
+2 0
+3 1
+4 18.8496
+5 -39.5841
+6 0
+7 1
+bjlbjl after PtFMM_Evaluate scaleSrc: 0 -18.8496
+1 39.5841
+2 0
+3 0.000333333
+4 18.8496
+5 -39.5841
+6 0
+7 0.000333333
+
+  above matches
+
+  bjlbjl before PtFMM_Evaluate trgValue: 0 0
+1 0
+2 0
+3 0
+4 0
+5 0
+bjlbjl after PtFMM_Evaluate trgValue: 0 1.125
+1 -2.3625
+2 0
+3 5.0625
+4 -10.6313
+5 0
+bjlbjl after scaleTrg trgValue: 0 0.000375
+1 -0.0007875
+2 0
+3 1.875e-10
+4 -3.9375e-10
+5 0
+    */
+
+    std::cout << "bjlbjl before PtFMM_Evaluate trgValue: ";
+    for (int i=0; i<trgValue.size(); ++i) {
+      std::cout << i << " " << trgValue[i] << std::endl;
+    }
     PtFMM_Evaluate(treePtr, trgValue, &srcSLValue, &srcDLValue);
+    std::cout << "bjlbjl after PtFMM_Evaluate trgValue: ";
+    for (int i=0; i<trgValue.size(); ++i) {
+      std::cout << i << " " << trgValue[i] << std::endl;
+    }
     periodizeFMM(trgValue);
     scaleTrg(trgValue, scale);
+    std::cout << "bjlbjl after scaleTrg trgValue: ";
+    for (int i=0; i<trgValue.size(); ++i) {
+      std::cout << i << " " << trgValue[i] << std::endl;
+    }
 }
 
 void FMMData::periodizeFMM(std::vector<double> &trgValue) {

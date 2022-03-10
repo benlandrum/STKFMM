@@ -81,6 +81,11 @@ void laplace_p_uKernel(Matrix<Real_t> &src_coord, Matrix<Real_t> &src_value, Mat
     }
 }
 
+template <class Real_t, class Vec_t = Real_t, size_t NWTN_ITER = 0>
+void laplace_p_uKernel(Matrix<Real_t> &src_coord, Matrix<Real_t> &src_value, Matrix<Real_t> &trg_coord,
+                       Matrix<Real_t> &trg_value) {
+}
+
 /**
  * @brief micro kernel for Laplace single layer potential + gradient
  *
@@ -736,6 +741,9 @@ struct LaplaceLayerKernel {
     inline static const Kernel<T> &PGrad();      ///< Laplace PGrad Kernel
     inline static const Kernel<T> &PGradGrad();  ///< Laplace PGradGrad
     inline static const Kernel<T> &QPGradGrad(); ///< Laplace Quadruple PGradGrad, no double layer
+    inline static const Kernel<T> &PGradReg();
+    inline static const Kernel<T> &PGradGradReg();
+    inline static const Kernel<T> &QPGradGradReg();
 
   private:
     /**
@@ -774,6 +782,10 @@ inline const Kernel<T> &LaplaceLayerKernel<T>::PGrad() {
 }
 
 template <class T>
+inline const Kernel<T> &LaplaceLayerKernel<T>::PGradReg() {
+}
+
+template <class T>
 inline const Kernel<T> &LaplaceLayerKernel<T>::PGradGrad() {
 
     static Kernel<T> lap_pker = BuildKernel<T, laplace_p<T, NEWTON_ITE>, laplace_dipolep<T, NEWTON_ITE>>(
@@ -790,6 +802,10 @@ inline const Kernel<T> &LaplaceLayerKernel<T>::PGradGrad() {
 }
 
 template <class T>
+inline const Kernel<T> &LaplaceLayerKernel<T>::PGradGradReg() {
+}
+
+template <class T>
 inline const Kernel<T> &LaplaceLayerKernel<T>::QPGradGrad() {
 
     static Kernel<T> lap_pker = BuildKernel<T, laplace_p<T, NEWTON_ITE>>("laplace", 3, std::pair<int, int>(1, 1));
@@ -803,6 +819,10 @@ inline const Kernel<T> &LaplaceLayerKernel<T>::QPGradGrad() {
         &lap_pker, &lap_pggker);
 
     return lap_pgker;
+}
+
+template <class T>
+inline const Kernel<T> &LaplaceLayerKernel<T>::QPGradGradReg() {
 }
 
 } // namespace pvfmm
