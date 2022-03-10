@@ -29,6 +29,7 @@ class KERNEL(enum.IntFlag):
     PVelGrad = 256  # Stokes
     PVelLaplacian = 512  # Stokes
     Traction = 1024  # Stokes
+    RPYReg = 4096
 
 
 class Stk3DFMM():

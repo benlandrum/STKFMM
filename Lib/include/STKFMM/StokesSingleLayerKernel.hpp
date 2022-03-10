@@ -98,7 +98,7 @@ void stokes_pvel_uKernel(Matrix<Real_t> &src_coord, Matrix<Real_t> &src_value, M
     }
 }
 
-GEN_KERNEL(stokes_pvel, stokes_pvel_uKernel, 4, 4)
+GEN_KERNEL(stokes_pvel, stokes_pvel_uKernel, 4, 4, 0)
 
 /*********************************************************
  *                                                        *
@@ -288,7 +288,7 @@ void stokes_pvelgrad_uKernel(Matrix<Real_t> &src_coord, Matrix<Real_t> &src_valu
     }
 }
 
-GEN_KERNEL(stokes_pvelgrad, stokes_pvelgrad_uKernel, 4, 16)
+GEN_KERNEL(stokes_pvelgrad, stokes_pvelgrad_uKernel, 4, 16, 0)
 
 /*********************************************************
  *                                                        *
@@ -393,7 +393,7 @@ void stokes_traction_uKernel(Matrix<Real_t> &src_coord, Matrix<Real_t> &src_valu
     }
 }
 
-GEN_KERNEL(stokes_traction, stokes_traction_uKernel, 4, 9)
+GEN_KERNEL(stokes_traction, stokes_traction_uKernel, 4, 9, 0)
 
 /*********************************************************
  *                                                        *
@@ -492,7 +492,7 @@ void stokes_pvellaplacian_uKernel(Matrix<Real_t> &src_coord, Matrix<Real_t> &src
     }
 }
 
-GEN_KERNEL(stokes_pvellaplacian, stokes_pvellaplacian_uKernel, 4, 7)
+GEN_KERNEL(stokes_pvellaplacian, stokes_pvellaplacian_uKernel, 4, 7, 0)
 
 } // namespace pvfmm
 #endif // STOKESSINGLELAYERKERNEL_HPP

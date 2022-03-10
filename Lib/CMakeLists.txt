@@ -10,7 +10,7 @@ target_include_directories(
          $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/>
          ${PVFMM_INCLUDE_DIR}/pvfmm ${PVFMM_DEP_INCLUDE_DIR})
 target_link_libraries(STKFMM_SHARED PUBLIC ${PVFMM_LIB_DIR}/${PVFMM_SHARED_LIB}
-                                           ${PVFMM_DEP_LIB} OpenMP::OpenMP_CXX MPI::MPI_CXX)
+                                           ${PVFMM_DEP_LIB} ${DEP_LIB} MPI::MPI_CXX)
 
 target_compile_options(STKFMM_SHARED PUBLIC ${OpenMP_CXX_FLAGS})
 # static lib

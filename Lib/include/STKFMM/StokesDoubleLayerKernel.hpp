@@ -114,7 +114,7 @@ void stokes_doublepvel_uKernel(Matrix<Real_t> &src_coord, Matrix<Real_t> &src_va
     }
 }
 
-GEN_KERNEL(stokes_doublepvel, stokes_doublepvel_uKernel, 9, 4)
+GEN_KERNEL(stokes_doublepvel, stokes_doublepvel_uKernel, 9, 4, 0)
 
 /*********************************************************
  *                                                        *
@@ -365,7 +365,7 @@ void stokes_doublepvelgrad_uKernel(Matrix<Real_t> &src_coord, Matrix<Real_t> &sr
     }
 }
 
-GEN_KERNEL(stokes_doublepvelgrad, stokes_doublepvelgrad_uKernel, 9, 16)
+GEN_KERNEL(stokes_doublepvelgrad, stokes_doublepvelgrad_uKernel, 9, 16, 0)
 
 /*********************************************************
  *                                                        *
@@ -517,7 +517,7 @@ void stokes_doublelaplacian_uKernel(Matrix<Real_t> &src_coord, Matrix<Real_t> &s
     }
 }
 
-GEN_KERNEL(stokes_doublelaplacian, stokes_doublelaplacian_uKernel, 9, 7)
+GEN_KERNEL(stokes_doublelaplacian, stokes_doublelaplacian_uKernel, 9, 7, 0)
 
 /*********************************************************
  *                                                        *
@@ -723,7 +723,7 @@ void stokes_doubletraction_uKernel(Matrix<Real_t> &src_coord, Matrix<Real_t> &sr
     }
 }
 
-GEN_KERNEL(stokes_doubletraction, stokes_doubletraction_uKernel, 9, 9)
+GEN_KERNEL(stokes_doubletraction, stokes_doubletraction_uKernel, 9, 9, 0)
 
 } // namespace pvfmm
 #endif

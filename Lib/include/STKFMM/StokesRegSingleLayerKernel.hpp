@@ -393,10 +393,10 @@ void stokes_velomega_uKernel(Matrix<Real_t> &src_coord, Matrix<Real_t> &src_valu
     }
 }
 
-GEN_KERNEL(stokes_regvel, stokes_regvel_uKernel, 4, 3)
-GEN_KERNEL(stokes_velomega, stokes_velomega_uKernel, 3, 6)
-GEN_KERNEL(stokes_regftvel, stokes_regftvel_uKernel, 7, 3)
-GEN_KERNEL(stokes_regftvelomega, stokes_regftvelomega_uKernel, 7, 6)
+GEN_KERNEL(stokes_regvel, stokes_regvel_uKernel, 4, 3, 0)
+GEN_KERNEL(stokes_velomega, stokes_velomega_uKernel, 3, 6, 0)
+GEN_KERNEL(stokes_regftvel, stokes_regftvel_uKernel, 7, 3, 0)
+GEN_KERNEL(stokes_regftvelomega, stokes_regftvelomega_uKernel, 7, 6, 0)
 
 template <class T>
 struct StokesRegKernel {

@@ -90,6 +90,7 @@ void Stk3DFMM::evaluateFMM(const KERNEL kernel, const int nSL, const double *src
     srcSLValueInternal.resize(nSL * fmm.kdimSL);
     trgValueInternal.resize(nTrg * fmm.kdimTrg);
     std::copy(srcSLValuePtr, srcSLValuePtr + nSL * fmm.kdimSL, srcSLValueInternal.begin());
+    std::copy(trgValuePtr, trgValuePtr + nTrg * fmm.kdimTrg, trgValueInternal.begin());
 
     // run FMM with proper scaling
     if (fmm.hasDL()) {
@@ -104,10 +105,9 @@ void Stk3DFMM::evaluateFMM(const KERNEL kernel, const int nSL, const double *src
     const int nloop = nTrg * fmm.kdimTrg;
 #pragma omp parallel for
     for (int i = 0; i < nloop; i++) {
-        trgValuePtr[i] += trgValueInternal[i];
+        // TODO: Should I be setting here?
+        trgValuePtr[i] = trgValueInternal[i];
     }
-
-    return;
 }
 
 void Stk3DFMM::clearFMM(KERNEL kernel) {

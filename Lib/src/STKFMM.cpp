@@ -21,6 +21,7 @@ const std::unordered_map<KERNEL, const pvfmm::Kernel<double> *> kernelMap = {
     {KERNEL::LapQPGradGrad, &pvfmm::LaplaceLayerKernel<double>::QPGradGrad()},
     {KERNEL::Stokes, &pvfmm::StokesLayerKernel<double>::Vel()},
     {KERNEL::RPY, &pvfmm::RPYKernel<double>::ulapu()},
+    {KERNEL::RPYReg, &pvfmm::RPYKernel<double>::regularized()},
     {KERNEL::StokesRegVel, &pvfmm::StokesRegKernel<double>::Vel()},
     {KERNEL::StokesRegVelOmega, &pvfmm::StokesRegKernel<double>::FTVelOmega()},
     {KERNEL::PVel, &pvfmm::StokesLayerKernel<double>::PVel()},

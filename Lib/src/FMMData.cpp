@@ -51,8 +51,8 @@ void FMMData::setupPeriodicData() {
 }
 
 // constructor
-FMMData::FMMData(KERNEL kernelChoice_, PAXIS periodicity_, int multOrder_, int maxPts_, bool enableFF_)
-    : kernelChoice(kernelChoice_), periodicity(periodicity_), multOrder(multOrder_), maxPts(maxPts_), treePtr(nullptr),
+FMMData::FMMData(KERNEL kernelChoice_, PAXIS periodicity_, int multOrder_, int maxPts_, bool enableFF_, int maxDepth_)
+    : kernelChoice(kernelChoice_), periodicity(periodicity_), multOrder(multOrder_), maxPts(maxPts_), maxDepth(maxDepth_), treePtr(nullptr),
       matrixPtr(nullptr), treeDataPtr(nullptr), enableFF(enableFF_) {
 
     comm = MPI_COMM_WORLD;
@@ -104,7 +104,7 @@ void FMMData::setupTree(const std::vector<double> &srcSLCoord, const std::vector
     // trgCoord and srcCoord have been scaled to [0,1)^3
     // setup treeData
     treeDataPtr->dim = 3;
-    treeDataPtr->max_depth = PVFMM_MAX_DEPTH;
+    treeDataPtr->max_depth = maxDepth > 0 ? maxDepth : PVFMM_MAX_DEPTH;
     treeDataPtr->max_pts = maxPts;
 
     treeDataPtr->src_coord = srcSLCoord;
@@ -189,8 +189,8 @@ void FMMData::evaluateFMM(std::vector<double> &srcSLValue, std::vector<double> &
         exit(1);
     }
     scaleSrc(srcSLValue, srcDLValue, scale);
-    std::fill(trgValue.begin(), trgValue.end(), 0.0);
-    PtFMM_Evaluate(treePtr, trgValue, nTrg, &srcSLValue, &srcDLValue);
+    scaleTrg(trgValue, 1.0 / scale);
+    PtFMM_Evaluate(treePtr, trgValue, &srcSLValue, &srcDLValue);
     periodizeFMM(trgValue);
     scaleTrg(trgValue, scale);
 }
@@ -290,7 +290,7 @@ void FMMData::scaleSrc(std::vector<double> &srcSLValue, std::vector<double> &src
 
     const int nSL = srcSLValue.size() / kdimSL;
     if (kernelChoice == KERNEL::PVel || kernelChoice == KERNEL::PVelGrad || kernelChoice == KERNEL::PVelLaplacian ||
-        kernelChoice == KERNEL::Traction || kernelChoice == KERNEL::RPY || kernelChoice == KERNEL::StokesRegVel) {
+        kernelChoice == KERNEL::Traction || kernelChoice == KERNEL::RPY || kernelChoice == KERNEL::RPYReg || kernelChoice == KERNEL::StokesRegVel) {
         // Stokes, RPY, StokesRegVel
 #pragma omp parallel for
         for (int i = 0; i < nSL; i++) {
@@ -459,6 +459,18 @@ void FMMData::scaleTrg(std::vector<double> &trgValue, const double scaleFactor) 
             // laplacian vel
             for (int j = 3; j < 6; ++j)
                 trgValue[i * 6 + j] *= scaleFactor * scaleFactor * scaleFactor;
+        }
+    } break;
+    case KERNEL::RPYReg: {
+        // 3 + 1
+#pragma omp parallel for
+        for (int i = 0; i < nTrg; i++) {
+	    // vel
+	    for (int j = 0; j < 3; ++j) {
+	        trgValue[i * 4 + j] *= scaleFactor;
+	    }
+	    // radius
+	    trgValue[i * 4 + 3] /= scaleFactor;
         }
     } break;
     }

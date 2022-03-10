@@ -716,14 +716,14 @@ void laplace_quadpgradgrad_uKernel(Matrix<Real_t> &src_coord, Matrix<Real_t> &sr
     }
 }
 
-GEN_KERNEL(laplace_p, laplace_p_uKernel, 1, 1)
-GEN_KERNEL(laplace_pgrad, laplace_pgrad_uKernel, 1, 4)
-GEN_KERNEL(laplace_pgradgrad, laplace_pgradgrad_uKernel, 1, 10)
-GEN_KERNEL(laplace_dipolep, laplace_dipolep_uKernel, 3, 1)
-GEN_KERNEL(laplace_dipolepgrad, laplace_dipolepgrad_uKernel, 3, 4)
-GEN_KERNEL(laplace_dipolepgradgrad, laplace_dipolepgradgrad_uKernel, 3, 10)
-GEN_KERNEL(laplace_quadp, laplace_quadp_uKernel, 9, 1)
-GEN_KERNEL(laplace_quadpgradgrad, laplace_quadpgradgrad_uKernel, 9, 10)
+GEN_KERNEL(laplace_p, laplace_p_uKernel, 1, 1, 0)
+GEN_KERNEL(laplace_pgrad, laplace_pgrad_uKernel, 1, 4, 0)
+GEN_KERNEL(laplace_pgradgrad, laplace_pgradgrad_uKernel, 1, 10, 0)
+GEN_KERNEL(laplace_dipolep, laplace_dipolep_uKernel, 3, 1, 0)
+GEN_KERNEL(laplace_dipolepgrad, laplace_dipolepgrad_uKernel, 3, 4, 0)
+GEN_KERNEL(laplace_dipolepgradgrad, laplace_dipolepgradgrad_uKernel, 3, 10, 0)
+GEN_KERNEL(laplace_quadp, laplace_quadp_uKernel, 9, 1, 0)
+GEN_KERNEL(laplace_quadpgradgrad, laplace_quadpgradgrad_uKernel, 9, 10, 0)
 
 /**
  * @brief LaplaceLayerkernel class
