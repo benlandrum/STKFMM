@@ -40,6 +40,7 @@ else()
   find_package(OpenMP REQUIRED)
   set(DEP_LIB OpenMP::OpenMP_CXX)
 endif()
+find_package(matplotlib_cpp REQUIRED)
 
 enable_testing()
 
