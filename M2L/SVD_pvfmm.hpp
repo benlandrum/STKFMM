@@ -31,6 +31,7 @@ using EVec = Eigen::VectorXd;
 using EMat = Eigen::MatrixXd;
 
 constexpr double eps = std::numeric_limits<double>::epsilon() * 10;
+// This did not change the error from 0.0620223.
 constexpr int DIRECTLAYER = 2;
 constexpr int SUM1D = 500000;
 
@@ -428,6 +429,7 @@ void SVD(const size_t dim[2], T *U_, T *S_, T *V_, T eps = -1) {
 template <class T>
 inline void svd(char *JOBU, char *JOBVT, int *M, int *N, T *A, int *LDA, T *S, T *U, int *LDU, T *VT, int *LDVT,
                 T *WORK, int *LWORK, int *INFO) {
+  std::cout << "bjlbjl svd" << std::endl;
 
     const size_t dim[2] = {static_cast<size_t>(std::max(*N, *M)), static_cast<size_t>(std::min(*N, *M))};
 
@@ -577,13 +579,21 @@ void pinv_pvfmm(T *M, int n1, int n2, T eps, T *M_) {
     //	mem::aligned_delete < T > (wsbuf);
 
     T eps_ = tS[0] * eps;
+
+    int killed_eigenvalues = 0;
     for (int i = 0; i < k; i++)
         if (tS[i] < eps_) {
             tS[i] = 0;
+	    ++killed_eigenvalues;
         } else {
             tS[i] = 1.0 / tS[i];
             //			std::cout << tS[i] << std::endl;
         }
+    std::cout << "bjlbjl killed " << killed_eigenvalues << " eigenvalue(s)" << std::endl;
+    std::cout << "bjlbjl printing eigenvalues" << std::endl;
+    for (int i = 0; i < k; ++i) {
+      std::cout << tS[i] << std::endl;
+    }
     for (int i = 0; i < m; i++) {
         for (int j = 0; j < k; j++) {
             tU[i + j * m] *= tS[j];
@@ -597,7 +607,8 @@ void pinv_pvfmm(T *M, int n1, int n2, T eps, T *M_) {
 }
 
 inline void pinv(const EMat &Mat, EMat &MatPinv) {
-    double eps = 1;
+  std::cout << "bjlbjl this is OTHER pinv, which calls pinv_pvfmm" << std::endl;
+  double eps = 1;
     while (eps + 1.0 > 1.0) {
         eps *= 0.5;
     }
@@ -625,7 +636,7 @@ inline void pinv(const EMat &Mat, EMat &MatPinv) {
 }
 
 inline void pinv(const EMat &Mat, EMat &MatPinvU, EMat &MatPinvVT) {
-    // this is the really backward stable SVD used by pvfmm
+  std::cout << "bjlbjl this is the really backward stable SVD used by pvfmm" << std::endl;
 
     double eps = 1;
     while (eps * (double)0.5 + (double)1.0 > 1.0) {
@@ -634,6 +645,8 @@ inline void pinv(const EMat &Mat, EMat &MatPinvU, EMat &MatPinvVT) {
 
     std::vector<double> M(Mat.cols() * Mat.rows());
     std::vector<double> Mpinv(M.size());
+
+    // Fill M with the input from Mat.
 
     // row major
     for (int i = 0; i < Mat.rows(); i++) {
@@ -686,9 +699,16 @@ inline void pinv(const EMat &Mat, EMat &MatPinvU, EMat &MatPinvVT) {
 
     double eps_ = tS[0] * eps;
 
+    // Pseudoinvert tS.
+    int killed_eigenvalues = 0;
     for (int i = 0; i < k; i++) {
-        tS[i] = (tS[i] > eps_ * 4 ? 1.0 / tS[i] : 0.0);
+      if (tS[i] <= eps_ * 4)
+	++killed_eigenvalues;
+      tS[i] = (tS[i] > eps_ * 4 ? 1.0 / tS[i] : 0.0);
     }
+    std::cout << "bjlbjl killed " << killed_eigenvalues << " eigenvalue(s)" << std::endl;
+    std::cout << "bjlbjl min eigval " << tS[0] << " max eigval " << tS[k-1] << std::endl;
+    std::cout << "bjlbjl condition number " << tS[k-1] / tS[0]  << std::endl;
 
     //	for (int i = 0; i < k; i++)
     //		if (tS[i] < eps_) {
@@ -697,11 +717,16 @@ inline void pinv(const EMat &Mat, EMat &MatPinvU, EMat &MatPinvVT) {
     //			tS[i] = 1.0 / tS[i];
     ////			std::cout << tS[i] << std::endl;
     //		}
+
+    // tU gets multiplied in places by tS^{-1}.
+
     for (int i = 0; i < m; i++) {
         for (int j = 0; j < k; j++) {
             tU[i + j * m] *= tS[j];
         }
     }
+
+    // Deserialize tU to MatPinvU.
 
     MatPinvU.resize(m, k);
     MatPinvVT.resize(n, k);
@@ -710,6 +735,8 @@ inline void pinv(const EMat &Mat, EMat &MatPinvU, EMat &MatPinvVT) {
             MatPinvU(i, j) = tU[i * k + j];
         }
     }
+
+    // Deserialize tVT to MatPinvVT.
 
     for (int i = 0; i < n; i++) {
         for (int j = 0; j < k; j++) {
