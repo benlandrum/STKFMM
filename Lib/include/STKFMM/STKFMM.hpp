@@ -197,7 +197,7 @@ class Stk3DFMM : public STKFMM {
      * @param kernelComb_
      */
     Stk3DFMM(int multOrder = 10, int maxPts = 2000, PAXIS pbc_ = PAXIS::NONE,
-             unsigned int kernelComb_ = asInteger(KERNEL::Stokes) | asInteger(KERNEL::RPY), bool enableFF_ = true);
+             unsigned int kernelComb_ = asInteger(KERNEL::Stokes) | asInteger(KERNEL::RPY) | asInteger(KERNEL::StokesGrad), bool enableFF_ = true);
 
     virtual void setPoints(const int nSL, const double *srcSLCoordPtr, const int nTrg, const double *trgCoordPtr,
                            const int nDL = 0, const double *srcDLCoordPtr = nullptr);

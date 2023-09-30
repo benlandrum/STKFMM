@@ -50,6 +50,12 @@ inline const Kernel<T> &StokesLayerKernel<T>::Vel() {
 }
 
 template <class T>
+inline const Kernel<T> &StokesLayerKernel<T>::VelGrad() {
+    static Kernel<T> ker = BuildKernel<T, stokes_vel<T, NEWTON_ITE>>("stokes_vel", 3, std::pair<int, int>(3, 3));
+    return ker;
+}
+
+template <class T>
 inline const Kernel<T> &StokesLayerKernel<T>::PVel() {
     static Kernel<T> stokes_pker = BuildKernel<T, stokes_pvel<T, NEWTON_ITE>, stokes_doublepvel<T, NEWTON_ITE>>(
         "stokes_PVel", 3, std::pair<int, int>(4, 4));
