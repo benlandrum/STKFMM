@@ -495,9 +495,9 @@ void stokes_pvellaplacian_uKernel(Matrix<Real_t> &src_coord, Matrix<Real_t> &src
 GEN_KERNEL(stokes_pvellaplacian, stokes_pvellaplacian_uKernel, 4, 7, 0)
 
 /*********************************************************
- *                                                        *
- * Stokes P Vel Laplacian kernel, source: 4, target: 7      *
- *                                                        *
+ *                                                       *
+ * Stokes Vel Grad kernel, source: 3, target: 3+9        *
+ *                                                       *
  **********************************************************/
 template <class Real_t, class Vec_t = Real_t, size_t NWTN_ITER>
 void stokes_velgrad_uKernel(Matrix<Real_t> &src_coord, Matrix<Real_t> &src_value, Matrix<Real_t> &trg_coord,
@@ -510,11 +510,9 @@ void stokes_velgrad_uKernel(Matrix<Real_t> &src_coord, Matrix<Real_t> &src_value
     }
     const Real_t FACV = 1.0 / (8 * nwtn_scal * nwtn_scal * nwtn_scal * const_pi<Real_t>());
     const Vec_t facv = set_intrin<Vec_t, Real_t>(FACV);
-    const Vec_t facp = set_intrin<Vec_t, Real_t>(2 * FACV);
 
     const Real_t FACV5 = 1.0 / (8 * nwtn_scal * nwtn_scal * nwtn_scal * nwtn_scal * nwtn_scal * const_pi<Real_t>());
     const Vec_t facv5 = set_intrin<Vec_t, Real_t>(FACV5);
-    const Vec_t facp5 = set_intrin<Vec_t, Real_t>(2 * FACV5);
     const Vec_t nthree = set_intrin<Vec_t, Real_t>(-3.0);
 
     size_t src_cnt_ = src_coord.Dim(1);
@@ -550,6 +548,7 @@ void stokes_velgrad_uKernel(Matrix<Real_t> &src_coord, Matrix<Real_t> &src_value
                 const Vec_t fx = bcast_intrin<Vec_t>(&src_value[0][s]);
                 const Vec_t fy = bcast_intrin<Vec_t>(&src_value[1][s]);
                 const Vec_t fz = bcast_intrin<Vec_t>(&src_value[2][s]);
+                const Vec_t tr = bcast_intrin<Vec_t>(&src_value[3][s]); // trace of doublet
 
                 Vec_t r2 = mul_intrin(dx, dx);
                 r2 = add_intrin(r2, mul_intrin(dy, dy));
@@ -563,13 +562,9 @@ void stokes_velgrad_uKernel(Matrix<Real_t> &src_coord, Matrix<Real_t> &src_value
                 commonCoeff = add_intrin(commonCoeff, mul_intrin(fy, dy));
                 commonCoeff = add_intrin(commonCoeff, mul_intrin(fz, dz));
 
-                commonCoeff = sub_intrin(commonCoeff, tr);
                 vx = add_intrin(vx, mul_intrin(add_intrin(mul_intrin(r2, fx), mul_intrin(dx, commonCoeff)), rinv3));
                 vy = add_intrin(vy, mul_intrin(add_intrin(mul_intrin(r2, fy), mul_intrin(dy, commonCoeff)), rinv3));
                 vz = add_intrin(vz, mul_intrin(add_intrin(mul_intrin(r2, fz), mul_intrin(dz, commonCoeff)), rinv3));
-                Vec_t px = zero_intrin<Vec_t>(); // p grad x
-                Vec_t py = zero_intrin<Vec_t>(); // p grad y
-                Vec_t pz = zero_intrin<Vec_t>(); // p grad z
 
                 Vec_t vxx = zero_intrin<Vec_t>(); // vx grad
                 Vec_t vxy = zero_intrin<Vec_t>(); //
@@ -591,16 +586,7 @@ void stokes_velgrad_uKernel(Matrix<Real_t> &src_coord, Matrix<Real_t> &src_value
                 Vec_t qyz = mul_intrin(nthree, mul_intrin(dy, dz));
                 Vec_t qzz = add_intrin(r2, mul_intrin(nthree, mul_intrin(dz, dz)));
 
-                // px dp/dx, etc
-                commonCoeff = add_intrin(commonCoeff, tr);
-                px = add_intrin(mul_intrin(r2, fx), mul_intrin(mul_intrin(nthree, dx), commonCoeff));
-                py = add_intrin(mul_intrin(r2, fy), mul_intrin(mul_intrin(nthree, dy), commonCoeff));
-                pz = add_intrin(mul_intrin(r2, fz), mul_intrin(mul_intrin(nthree, dz), commonCoeff));
-
-		// bjlbjl kill facp? facp5? px py pz pgxSum
-
                 // vxx = dvx/dx , etc
-                commonCoeff = sub_intrin(commonCoeff, tr);
                 vxx = mul_intrin(qxx, commonCoeff);
                 vxy = add_intrin(mul_intrin(qxy, commonCoeff),
                                  mul_intrin(r2, sub_intrin(mul_intrin(dx, fy), mul_intrin(dy, fx))));
@@ -619,7 +605,6 @@ void stokes_velgrad_uKernel(Matrix<Real_t> &src_coord, Matrix<Real_t> &src_value
                                  mul_intrin(r2, sub_intrin(mul_intrin(dz, fy), mul_intrin(dy, fz))));
                 vzz = mul_intrin(qzz, commonCoeff);
 
-                // calculate grad
                 vxgxSum = add_intrin(vxgxSum, mul_intrin(vxx, rinv5));
                 vxgySum = add_intrin(vxgySum, mul_intrin(vxy, rinv5));
                 vxgzSum = add_intrin(vxgzSum, mul_intrin(vxz, rinv5));
@@ -664,9 +649,6 @@ void stokes_velgrad_uKernel(Matrix<Real_t> &src_coord, Matrix<Real_t> &src_value
         }
     }
 }
-}
-
-// bjlbjl add
 
 GEN_KERNEL(stokes_velgrad, stokes_velgrad_uKernel, 3, 12, 0)
 
