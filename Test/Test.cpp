@@ -15,6 +15,7 @@ std::unordered_map<KERNEL, std::pair<kernel_func, kernel_func>>
                 {KERNEL::LapPGradGrad, std::make_pair(LaplaceSLPGradGrad, LaplaceDLPGradGrad)},
                 {KERNEL::LapQPGradGrad, std::make_pair(LaplaceQPGradGrad, nullptr)},
                 {KERNEL::Stokes, std::make_pair(StokesSL, nullptr)},
+		//{KERNEL::StokesGrad, std::make_pair(StokesSLGrad, nullptr)},
                 {KERNEL::RPY, std::make_pair(StokesSLRPY, nullptr)},
 		//{KERNEL::RPYReg, std::make_pair(RPYRegSL, nullptr)},
                 {KERNEL::StokesRegVel, std::make_pair(StokesRegSLVel, nullptr)},
@@ -453,7 +454,7 @@ void runSimpleKernel(const Config &config, const Point &point, Input &input, Res
         PointDistribution::collectPtsAll(srcDLCoordGlobal);
 
         KERNEL kernel = data.first;
-	if (kernel == KERNEL::RPYReg)
+	if (kernel == KERNEL::RPYReg || kernel == KERNEL::StokesGrad)
 	  throw std::runtime_error("not yet supported");
         auto &value = data.second;
         int kdimSL, kdimDL, kdimTrg;

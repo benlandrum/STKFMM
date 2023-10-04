@@ -58,7 +58,9 @@ enum class KERNEL : unsigned {
     Traction = 1024,     ///< Stokes
 
     LapGrad = 2048,
-    RPYReg = 4096
+    RPYReg = 4096,
+
+    StokesGrad = 8192
 };
 
 /**

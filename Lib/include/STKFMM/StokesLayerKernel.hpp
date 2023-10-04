@@ -28,6 +28,7 @@ namespace pvfmm {
 template <class T>
 struct StokesLayerKernel {
     inline static const Kernel<T> &Vel();           ///< Stokeslet 3x3, SL->Vel
+    inline static const Kernel<T> &VelGrad();       ///< Stokeslet 3x3, SL->VelGrad
     inline static const Kernel<T> &PVel();          ///< SL+DL -> PVel
     inline static const Kernel<T> &PVelGrad();      ///< SL+DL -> PVelGrad
     inline static const Kernel<T> &PVelLaplacian(); ///< SL+DL -> PVelLaplacian
@@ -47,6 +48,22 @@ template <class T>
 inline const Kernel<T> &StokesLayerKernel<T>::Vel() {
     static Kernel<T> ker = BuildKernel<T, stokes_vel<T, NEWTON_ITE>>("stokes_vel", 3, std::pair<int, int>(3, 3));
     return ker;
+}
+
+template <class T>
+inline const Kernel<T> &StokesLayerKernel<T>::VelGrad() {
+  static Kernel<T> full_kernel = BuildKernel<T, stokes_velgrad<T, NEWTON_ITE>>(
+        "stokes_velgrad", 3, std::pair<int, int>(3, 12),
+        &StokesKernel<T>::velocity(),  // k_s2m
+	&StokesKernel<T>::velocity(),  // k_s2l
+	NULL,                          // k_s2t
+	&StokesKernel<T>::velocity(),  // k_m2m
+	&StokesKernel<T>::velocity(),  // k_m2l
+	NULL,                          // k_m2t
+	&StokesKernel<T>::velocity(),  // k_l2l
+	NULL,                          // k_l2t
+	NULL);
+  return full_kernel;
 }
 
 template <class T>

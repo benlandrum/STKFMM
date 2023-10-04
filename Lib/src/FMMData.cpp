@@ -429,6 +429,20 @@ void FMMData::scaleTrg(std::vector<double> &trgValue, const double scaleFactor) 
             trgValue[i] *= scaleFactor; // vel 1/r
         }
     } break;
+    case KERNEL::StokesGrad: {
+        // 3+9
+#pragma omp parallel for
+        for (int i = 0; i < nTrg; i++) {
+            // vel
+            for (int j = 0; j < 3; j++) {
+                trgValue[12 * i + j] *= scaleFactor;
+            }
+            // grad vel
+            for (int j = 3; j < 12; j++) {
+                trgValue[12 * i + j] *= scaleFactor * scaleFactor;
+            }
+	}
+    } break;
     case KERNEL::StokesRegVel: {
         // 3
         const int nloop = nTrg * 3;

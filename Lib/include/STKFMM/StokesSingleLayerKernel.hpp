@@ -494,5 +494,163 @@ void stokes_pvellaplacian_uKernel(Matrix<Real_t> &src_coord, Matrix<Real_t> &src
 
 GEN_KERNEL(stokes_pvellaplacian, stokes_pvellaplacian_uKernel, 4, 7, 0)
 
+/*********************************************************
+ *                                                       *
+ * Stokes Vel Grad kernel, source: 3, target: 3+9        *
+ *                                                       *
+ **********************************************************/
+template <class Real_t, class Vec_t = Real_t, size_t NWTN_ITER>
+void stokes_velgrad_uKernel(Matrix<Real_t> &src_coord, Matrix<Real_t> &src_value, Matrix<Real_t> &trg_coord,
+			    Matrix<Real_t> &trg_value) {
+    size_t VecLen = sizeof(Vec_t) / sizeof(Real_t);
+
+    Real_t nwtn_scal = 1; // scaling factor for newton iterations
+    for (int i = 0; i < NWTN_ITER; i++) {
+        nwtn_scal = 2 * nwtn_scal * nwtn_scal * nwtn_scal;
+    }
+    const Real_t FACV = 1.0 / (8 * nwtn_scal * nwtn_scal * nwtn_scal * const_pi<Real_t>());
+    const Vec_t facv = set_intrin<Vec_t, Real_t>(FACV);
+
+    const Real_t FACV5 = 1.0 / (8 * nwtn_scal * nwtn_scal * nwtn_scal * nwtn_scal * nwtn_scal * const_pi<Real_t>());
+    const Vec_t facv5 = set_intrin<Vec_t, Real_t>(FACV5);
+    const Vec_t nthree = set_intrin<Vec_t, Real_t>(-3.0);
+
+    size_t src_cnt_ = src_coord.Dim(1);
+    size_t trg_cnt_ = trg_coord.Dim(1);
+
+    for (size_t sblk = 0; sblk < src_cnt_; sblk += SRC_BLK) {
+        size_t src_cnt = src_cnt_ - sblk;
+        if (src_cnt > SRC_BLK)
+            src_cnt = SRC_BLK;
+        for (size_t t = 0; t < trg_cnt_; t += VecLen) {
+            const Vec_t tx = load_intrin<Vec_t>(&trg_coord[0][t]);
+            const Vec_t ty = load_intrin<Vec_t>(&trg_coord[1][t]);
+            const Vec_t tz = load_intrin<Vec_t>(&trg_coord[2][t]);
+
+            Vec_t vx = zero_intrin<Vec_t>();      // vx
+            Vec_t vy = zero_intrin<Vec_t>();      // vy
+            Vec_t vz = zero_intrin<Vec_t>();      // vz
+            Vec_t vxgxSum = zero_intrin<Vec_t>(); // vx grad
+            Vec_t vxgySum = zero_intrin<Vec_t>(); //
+            Vec_t vxgzSum = zero_intrin<Vec_t>(); //
+            Vec_t vygxSum = zero_intrin<Vec_t>(); // vy grad
+            Vec_t vygySum = zero_intrin<Vec_t>(); //
+            Vec_t vygzSum = zero_intrin<Vec_t>(); //
+            Vec_t vzgxSum = zero_intrin<Vec_t>(); // vz grad
+            Vec_t vzgySum = zero_intrin<Vec_t>(); //
+            Vec_t vzgzSum = zero_intrin<Vec_t>(); //
+
+            for (size_t s = sblk; s < sblk + src_cnt; s++) {
+                const Vec_t dx = sub_intrin(tx, bcast_intrin<Vec_t>(&src_coord[0][s]));
+                const Vec_t dy = sub_intrin(ty, bcast_intrin<Vec_t>(&src_coord[1][s]));
+                const Vec_t dz = sub_intrin(tz, bcast_intrin<Vec_t>(&src_coord[2][s]));
+
+                const Vec_t fx = bcast_intrin<Vec_t>(&src_value[0][s]);
+                const Vec_t fy = bcast_intrin<Vec_t>(&src_value[1][s]);
+                const Vec_t fz = bcast_intrin<Vec_t>(&src_value[2][s]);
+                const Vec_t tr = bcast_intrin<Vec_t>(&src_value[3][s]); // trace of doublet
+
+                Vec_t r2 = mul_intrin(dx, dx);
+                r2 = add_intrin(r2, mul_intrin(dy, dy));
+                r2 = add_intrin(r2, mul_intrin(dz, dz));
+
+                Vec_t rinv = rsqrt_wrapper<Vec_t, Real_t, NWTN_ITER>(r2);
+                Vec_t rinv3 = mul_intrin(mul_intrin(rinv, rinv), rinv);
+                Vec_t rinv5 = mul_intrin(mul_intrin(rinv, rinv), rinv3);
+
+                Vec_t commonCoeff = mul_intrin(fx, dx);
+                commonCoeff = add_intrin(commonCoeff, mul_intrin(fy, dy));
+                commonCoeff = add_intrin(commonCoeff, mul_intrin(fz, dz));
+
+                vx = add_intrin(vx, mul_intrin(add_intrin(mul_intrin(r2, fx), mul_intrin(dx, commonCoeff)), rinv3));
+                vy = add_intrin(vy, mul_intrin(add_intrin(mul_intrin(r2, fy), mul_intrin(dy, commonCoeff)), rinv3));
+                vz = add_intrin(vz, mul_intrin(add_intrin(mul_intrin(r2, fz), mul_intrin(dz, commonCoeff)), rinv3));
+
+                Vec_t vxx = zero_intrin<Vec_t>(); // vx grad
+                Vec_t vxy = zero_intrin<Vec_t>(); //
+                Vec_t vxz = zero_intrin<Vec_t>(); //
+
+                Vec_t vyx = zero_intrin<Vec_t>(); // vy grad
+                Vec_t vyy = zero_intrin<Vec_t>(); //
+                Vec_t vyz = zero_intrin<Vec_t>(); //
+
+                Vec_t vzx = zero_intrin<Vec_t>(); // vz grad
+                Vec_t vzy = zero_intrin<Vec_t>(); //
+                Vec_t vzz = zero_intrin<Vec_t>(); //
+
+                // qij = r^2 \delta_{ij} - 3 ri rj, symmetric
+                Vec_t qxx = add_intrin(r2, mul_intrin(nthree, mul_intrin(dx, dx)));
+                Vec_t qxy = mul_intrin(nthree, mul_intrin(dx, dy));
+                Vec_t qxz = mul_intrin(nthree, mul_intrin(dx, dz));
+                Vec_t qyy = add_intrin(r2, mul_intrin(nthree, mul_intrin(dy, dy)));
+                Vec_t qyz = mul_intrin(nthree, mul_intrin(dy, dz));
+                Vec_t qzz = add_intrin(r2, mul_intrin(nthree, mul_intrin(dz, dz)));
+
+                // vxx = dvx/dx , etc
+                vxx = mul_intrin(qxx, commonCoeff);
+                vxy = add_intrin(mul_intrin(qxy, commonCoeff),
+                                 mul_intrin(r2, sub_intrin(mul_intrin(dx, fy), mul_intrin(dy, fx))));
+                vxz = add_intrin(mul_intrin(qxz, commonCoeff),
+                                 mul_intrin(r2, sub_intrin(mul_intrin(dx, fz), mul_intrin(dz, fx))));
+
+                vyx = add_intrin(mul_intrin(qxy, commonCoeff),
+                                 mul_intrin(r2, sub_intrin(mul_intrin(dy, fx), mul_intrin(dx, fy))));
+                vyy = mul_intrin(qyy, commonCoeff);
+                vyz = add_intrin(mul_intrin(qyz, commonCoeff),
+                                 mul_intrin(r2, sub_intrin(mul_intrin(dy, fz), mul_intrin(dz, fy))));
+
+                vzx = add_intrin(mul_intrin(qxz, commonCoeff),
+                                 mul_intrin(r2, sub_intrin(mul_intrin(dz, fx), mul_intrin(dx, fz))));
+                vzy = add_intrin(mul_intrin(qyz, commonCoeff),
+                                 mul_intrin(r2, sub_intrin(mul_intrin(dz, fy), mul_intrin(dy, fz))));
+                vzz = mul_intrin(qzz, commonCoeff);
+
+                vxgxSum = add_intrin(vxgxSum, mul_intrin(vxx, rinv5));
+                vxgySum = add_intrin(vxgySum, mul_intrin(vxy, rinv5));
+                vxgzSum = add_intrin(vxgzSum, mul_intrin(vxz, rinv5));
+
+                vygxSum = add_intrin(vygxSum, mul_intrin(vyx, rinv5));
+                vygySum = add_intrin(vygySum, mul_intrin(vyy, rinv5));
+                vygzSum = add_intrin(vygzSum, mul_intrin(vyz, rinv5));
+
+                vzgxSum = add_intrin(vzgxSum, mul_intrin(vzx, rinv5));
+                vzgySum = add_intrin(vzgySum, mul_intrin(vzy, rinv5));
+                vzgzSum = add_intrin(vzgzSum, mul_intrin(vzz, rinv5));
+            }
+
+            vx = add_intrin(mul_intrin(vx, facv), load_intrin<Vec_t>(&trg_value[0][t]));
+            vy = add_intrin(mul_intrin(vy, facv), load_intrin<Vec_t>(&trg_value[1][t]));
+            vz = add_intrin(mul_intrin(vz, facv), load_intrin<Vec_t>(&trg_value[2][t]));
+
+            vxgxSum = add_intrin(mul_intrin(vxgxSum, facv5), load_intrin<Vec_t>(&trg_value[3][t]));
+            vxgySum = add_intrin(mul_intrin(vxgySum, facv5), load_intrin<Vec_t>(&trg_value[4][t]));
+            vxgzSum = add_intrin(mul_intrin(vxgzSum, facv5), load_intrin<Vec_t>(&trg_value[5][t]));
+
+            vygxSum = add_intrin(mul_intrin(vygxSum, facv5), load_intrin<Vec_t>(&trg_value[6][t]));
+            vygySum = add_intrin(mul_intrin(vygySum, facv5), load_intrin<Vec_t>(&trg_value[7][t]));
+            vygzSum = add_intrin(mul_intrin(vygzSum, facv5), load_intrin<Vec_t>(&trg_value[8][t]));
+
+            vzgxSum = add_intrin(mul_intrin(vzgxSum, facv5), load_intrin<Vec_t>(&trg_value[9][t]));
+            vzgySum = add_intrin(mul_intrin(vzgySum, facv5), load_intrin<Vec_t>(&trg_value[10][t]));
+            vzgzSum = add_intrin(mul_intrin(vzgzSum, facv5), load_intrin<Vec_t>(&trg_value[11][t]));
+
+            store_intrin(&trg_value[0][t], vx);
+            store_intrin(&trg_value[1][t], vy);
+            store_intrin(&trg_value[2][t], vz);
+            store_intrin(&trg_value[3][t], vxgxSum);
+            store_intrin(&trg_value[4][t], vxgySum);
+            store_intrin(&trg_value[5][t], vxgzSum);
+            store_intrin(&trg_value[6][t], vygxSum);
+            store_intrin(&trg_value[7][t], vygySum);
+            store_intrin(&trg_value[8][t], vygzSum);
+            store_intrin(&trg_value[9][t], vzgxSum);
+            store_intrin(&trg_value[10][t], vzgySum);
+            store_intrin(&trg_value[11][t], vzgzSum);
+        }
+    }
+}
+
+GEN_KERNEL(stokes_velgrad, stokes_velgrad_uKernel, 3, 12, 0)
+
 } // namespace pvfmm
 #endif // STOKESSINGLELAYERKERNEL_HPP

@@ -41,6 +41,7 @@ void StokesDLRPY(double *s, double *t, double *f, double *vlapv);
 
 // TODO: Replicate the kernel here.
 //void RPYRegSL(double *s, double *t, double *f);
+//void StokesSLGrad(double *s, double *t, double *f);
 
 void StokesSL(double *s, double *t, double *f, double *v);
 void StokesDL(double *s, double *t, double *f, double *v);
