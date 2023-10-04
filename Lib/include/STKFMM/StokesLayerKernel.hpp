@@ -59,9 +59,9 @@ inline const Kernel<T> &StokesLayerKernel<T>::VelGrad() {
 	NULL,                          // k_s2t
 	&StokesKernel<T>::velocity(),  // k_m2m
 	&StokesKernel<T>::velocity(),  // k_m2l
-	&StokesKernel<T>::velocity(),  // k_m2t
+	NULL,                          // k_m2t
 	&StokesKernel<T>::velocity(),  // k_l2l
-	&StokesKernel<T>::velocity(),  // k_l2t
+	NULL,                          // k_l2t
 	NULL);
   return full_kernel;
 }
